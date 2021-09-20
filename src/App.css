@@ -1,0 +1,21 @@
+.main {
+    width: 90%;
+    margin: 5rem auto 0rem auto;
+}
+.main table {
+    width: 100%;
+    border: 1px solid black;
+}
+.main table tbody tr td {
+    border: 1px solid;
+    text-align: center;
+}
+.main table tbody tr img {
+    width: 80px;
+    margin: 10px;
+}
+.main__sort {
+    display: flex;
+    justify-content: space-between;
+    padding: 20px 0px;
+}

@@ -1,5 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
+import MyButton from "./Components/UI/button/MyButton";
+import MyInput from "./Components/UI/input/MyInput";
+import MySelect from "./Components/UI/select/MySelect";
+import ApiService from "./Components/Services/apiService";
+import Items from "./Components/Items/Items";
+
 
 function App() {
   const [errorMain, setError] = useState(null);
@@ -8,103 +14,79 @@ function App() {
   const [items, setItems] = useState([]);
   const [breeds, setBreeds] = useState([]);
 
-  const [valueSearch, setValueSearch] = useState('');
-  let valueSort = 'Не выбрано';
+  const [valuesFilter,  setValuesFilter] = useState({breed: '', search: ''})
+  const [valueSort, setValueSort] = useState('');
 
-  const call = (first = false) => {
-    const url = 'http://localhost:3200/';
-    let urlAditional = '';
-    const sortUrl = 'breed=';
-    const searchUrl = 'q=';
-    const question = '?';
-    const coniuction = '&';
-
-    if (valueSort === 'Не выбрано' && valueSearch) {
-      urlAditional = question + searchUrl + valueSearch;
-    }
-    if (valueSort !== 'Не выбрано' && !valueSearch) {
-      urlAditional = question + sortUrl + valueSort;
-    }
-    if (valueSort !== 'Не выбрано' && valueSearch) {
-      urlAditional = question + sortUrl + valueSort + coniuction + searchUrl + valueSearch;
+  const callItems = async () => {
+    try {
+      const result = await ApiService.getAll();
+      setItems([]);
+      setItems( result);
+      const breedsWithoutRepeat = [...new Set(result.map(item => item.breed.title))];
+      setBreeds(breedsWithoutRepeat.map(item => { return {title: item, id: result.find(value => value.breed.title === item).breed._id}}));
+      setIsLoaded(true);
+    } catch (e) {
+      setIsLoaded(true);
+      setError(e);
     }
 
-    fetch(url + urlAditional)
-      .then((res) => res.json())
-      .then(
-        (result) => {
-          setIsLoaded(true);
-          setItems(result);
-          if (first) {
-            const arr = [];
-            result.forEach((item) => arr.push(item.breed.title));
-            setBreeds(arr);
-          }
-        },
-        (error) => {
-          setIsLoaded(true);
-          setError(error);
-        },
-      );
-  };
+  }
+
+  async function callFilter () {
+    try {
+      setIsLoaded(false);
+      const result = await ApiService.postFilter(valuesFilter);
+      setItems([]);
+      setItems(result);
+      setIsLoaded(true);
+    } catch (e) {
+      setIsLoaded(true);
+      setError(e);
+    }
+  }
 
   useEffect(() => {
-    call(true);
+    callItems();
   }, []);
 
-  function sort(event) {
-    valueSort = event.target.value;
-    call();
+  useEffect(() => {
+    if ( valuesFilter.breed || valuesFilter.search)  {
+      callFilter()
+    }
+  }, [valuesFilter]);
+
+  const sort = (breed) => {
+    setValuesFilter({...valuesFilter, breed});
   }
   const search = () => {
-    if (valueSearch) {
-      call();
-    }
-  };
+    setValuesFilter({...valuesFilter, search: valueSort});
+  }
 
   if (errorMain) {
     return (
-      <div>
-        Ошибка:
-      </div>
+        <div>
+          Ошибка:
+        </div>
     );
   } if (!isLoaded) {
     return <div>Загрузка...</div>;
   }
+
   return (
     <div className="main">
-      <div className="main__sort">
-        <div>
-          <input type="text" placeholder="Введите текст" value={valueSearch} onChange={(event) => setValueSearch(event.target.value)} />
-          <button type="button" onClick={search}>Поиск</button>
+        <div className="main__sort">
+          <div>
+            <MyInput
+                value = {valueSort}
+                onChange={e=>setValueSort(e.target.value)}
+            />
+            <MyButton onClick = {search}>Поиск</MyButton>
+          </div>
+          <div>
+            <MySelect onChange = {sort} breeds = {breeds}/>
+          </div>
         </div>
-        <div>
-          <select onChange={sort}>
-            <option>Не выбрано</option>
-            {breeds.map((item) => (
-              <option>{item}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-      <table>
-        <tbody>
-          <tr>
-            <td>Заголовок</td>
-            <td>Порода</td>
-            <td>Картинка</td>
-          </tr>
-          {items.map((item) => (
-            <tr>
-              <td>{item.title}</td>
-              <td>{item.breed.title}</td>
-              <td>
-                <img alt={item.title} src={item.image} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+        <Items items={items}/>
     </div>
   );
 }

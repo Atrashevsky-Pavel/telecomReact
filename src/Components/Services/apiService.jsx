@@ -7,11 +7,7 @@ class ApiService {
     }
 
     static async postFilter(body) {
-        if (body.breed === 'Не выбрано') {
-            body.breed = '';
-        }
         const result = await axios.post('http://localhost:3200', body);
-        console.log(result.data);
         return result.data;
     }
 }

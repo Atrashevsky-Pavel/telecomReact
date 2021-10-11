@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import MyButton from "./Components/UI/button/MyButton";
 import MyInput from "./Components/UI/input/MyInput";
@@ -13,81 +13,91 @@ function App() {
 
   const [items, setItems] = useState([]);
   const [breeds, setBreeds] = useState([]);
+  const [startIndex, setStartIndex] = useState(0)
+  const [page, setPage] = useState({
+    current: 0,
+    total: 0
+  });
+  const step = 7;
 
-  const [valuesFilter,  setValuesFilter] = useState({breed: '', search: ''})
-  const [valueSort, setValueSort] = useState('');
+  const [valuesFilter,  setValuesFilter] = useState({breed: '', search: ''});
 
-  const callItems = async () => {
+  const fetchData = useCallback(async () => {
+    setIsLoaded(false)
     try {
-      const result = await ApiService.getAll();
-      setItems([]);
-      setItems( result);
-      const breedsWithoutRepeat = [...new Set(result.map(item => item.breed.title))];
-      setBreeds(breedsWithoutRepeat.map(item => { return {title: item, id: result.find(value => value.breed.title === item).breed._id}}));
-      setIsLoaded(true);
+      const response = await ApiService.postFilter(valuesFilter)
+      setItems(response)
+      if (!breeds.length) {
+        const breedsWithoutRepeat = [...new Set(response.map(item => item.breed.title))];
+        setBreeds(breedsWithoutRepeat.map(item => { return {title: item, id: response.find(value => value.breed.title === item).breed._id}}));
+      }
     } catch (e) {
-      setIsLoaded(true);
-      setError(e);
+      setError(e.message);
+    } finally {
+      setIsLoaded(true)
     }
-
-  }
-
-  async function callFilter () {
-    try {
-      setIsLoaded(false);
-      const result = await ApiService.postFilter(valuesFilter);
-      setItems([]);
-      setItems(result);
-      setIsLoaded(true);
-    } catch (e) {
-      setIsLoaded(true);
-      setError(e);
-    }
-  }
+  }, [valuesFilter, breeds.length])
 
   useEffect(() => {
-    callItems();
-  }, []);
+    fetchData()
+  }, [fetchData])
 
   useEffect(() => {
-    if ( valuesFilter.breed || valuesFilter.search)  {
-      callFilter()
+    setPage({
+      current: 1,
+      total: Math.ceil(items.length / step) || 1
+    })
+  }, [items])
+
+  const sort = (breed) => setValuesFilter({...valuesFilter, breed})
+
+  const search = (event) => setValuesFilter({...valuesFilter, search: event.target.value})
+
+  if (errorMain) return <div> Ошибка: {errorMain}</div>
+
+  const prevHandler = () => {
+    if (startIndex > step) {
+      setStartIndex(prev => prev - step)
+      setPage(prev => ({
+        ...page,
+        current: prev.current - 1,
+      }))
+    } else {
+      setStartIndex(0)
+      setPage({
+        ...page,
+        current: 1,
+      })
     }
-  }, [valuesFilter]);
-
-  const sort = (breed) => {
-    setValuesFilter({...valuesFilter, breed});
   }
-  const search = () => {
-    setValuesFilter({...valuesFilter, search: valueSort});
-  }
-
-  if (errorMain) {
-    return (
-        <div>
-          Ошибка:
-        </div>
-    );
-  } if (!isLoaded) {
-    return <div>Загрузка...</div>;
+  const nextHandler = () => {
+    if (startIndex < items.length - step) {
+      setStartIndex(prev => prev + step)
+      setPage(prev => ({
+        ...page,
+        current: prev.current + 1,
+      }))
+    }
   }
 
   return (
-    <div className="main">
+      <div className="main">
+        {!isLoaded && <div>Загрузка...</div>}
         <div className="main__sort">
           <div>
             <MyInput
-                value = {valueSort}
-                onChange={e=>setValueSort(e.target.value)}
+                onChange={search}
             />
-            <MyButton onClick = {search}>Поиск</MyButton>
           </div>
           <div>
             <MySelect onChange = {sort} breeds = {breeds}/>
           </div>
         </div>
-        <Items items={items}/>
-    </div>
+        <Items items={items.slice(startIndex, startIndex + step)} startIndex={startIndex}/>
+          <div>{page.current} / {page.total}</div>
+          <MyButton onClick = {prevHandler}>prev</MyButton>
+          <MyButton onClick = {nextHandler}>next</MyButton>
+      </div>
   );
 }
 
